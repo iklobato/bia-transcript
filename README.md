@@ -36,6 +36,8 @@ bia-transcript/
 
 ## Installation
 
+### Local Development
+
 1. Install dependencies using Poetry:
 ```bash
 poetry install
@@ -62,6 +64,30 @@ poetry run python app.py
 poetry shell
 python app.py
 ```
+
+### Docker Deployment
+
+1. Build the Docker image:
+```bash
+docker build -t bia-transcript .
+```
+
+2. Run the container:
+```bash
+docker run -p 8000:8000 bia-transcript
+```
+
+### DigitalOcean App Platform Deployment
+
+1. Push your code to GitHub
+2. Connect your repository to DigitalOcean App Platform
+3. Use the provided `do-app.yaml` configuration
+4. Deploy with:
+```bash
+doctl apps create --spec do-app.yaml
+```
+
+Or use the DigitalOcean web interface to deploy from your GitHub repository.
 
 ## API Endpoints
 

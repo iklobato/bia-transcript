@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bia Transcript</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .upload-section, .output-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background-color: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background-color: #f0f2ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .control-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .control-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .transcribe-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .transcribe-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .transcribe-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            margin: 20px 0;
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        #loadingMessage {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-top: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .output-content {
+            min-height: 300px;
+            display: none;
+        }
+
+        .output-content.show {
+            display: block;
+        }
+
+        .transcript-text {
+            background: #f8f9ff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .metadata {
+            background: #f0f2ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .metadata-label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .metadata-value {
+            color: #666;
+        }
+
+        .segments {
+            margin-top: 20px;
+        }
+
+        .segment {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+
+
+        .segment-time {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .segment-text {
+            flex: 1;
+            margin-left: 15px;
+        }
+
+        .error-message {
+            background: #ffe6e6;
+            border: 1px solid #ff9999;
+            border-radius: 8px;
+            padding: 15px;
+            color: #cc0000;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background: #e6ffe6;
+            border: 1px solid #99ff99;
+            border-radius: 8px;
+            padding: 15px;
+            color: #006600;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .api-info {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-top: 30px;
+        }
+
+        .api-info h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .supported-formats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .format-tag {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Bia Transcript</h1>
+            <p>Upload your audio file and get high-quality transcription</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <h2 class="section-title">📁 Upload Audio File</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drag and drop your audio file here</div>
+                    <div class="upload-text">or click to browse</div>
+                    <input type="file" id="fileInput" class="file-input" accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.avi,.mov,.mkv">
+                </div>
+
+                <div class="file-info" id="fileInfo">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-size" id="fileSize"></div>
+                </div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="languageSelect">Language:</label>
+                        <select id="languageSelect">
+                            <option value="pt" selected>Portuguese (pt)</option>
+                            <option value="en">English (en)</option>
+                            <option value="es">Spanish (es)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="de">German (de)</option>
+                        </select>
+                    </div>
+
+
+
+                    <button class="transcribe-btn" id="transcribeBtn" disabled>
+                        🎤 Transcribe Audio
+                    </button>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div id="loadingMessage">Processing your audio file...</div>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
+            </div>
+
+            <div class="output-section">
+                <h2 class="section-title">📝 Transcription Result</h2>
+                
+                <div class="output-content" id="outputContent">
+                    <div class="metadata" id="metadata"></div>
+                    <div class="transcript-text" id="transcriptText"></div>
+                    <div class="segments" id="segments"></div>
+                    <div class="download-section" id="downloadSection" style="display: none;">
+                        <button class="download-btn" id="downloadBtn">
+                            📥 Download Transcript
+                        </button>
+                    </div>
+                </div>
+
+                <div id="placeholderText" style="text-align: center; color: #666; margin-top: 100px;">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">📝</div>
+                    <div>Upload an audio file to see the transcription here</div>
+                </div>
+            </div>
+        </div>
+
+                    <div class="api-info">
+                <h3>🎯 Quality Features:</h3>
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <ul style="margin: 0; padding-left: 20px; color: #333;">
+                        <li><strong>Enhanced Whisper Settings</strong> - Optimized for accuracy</li>
+                        <li><strong>Multi-language Support</strong> - Supports multiple languages</li>
+
+                        <li><strong>Real-time Updates</strong> - WebSocket-based status updates</li>
+                    </ul>
+                </div>
+                
+                <h3>Queue Status:</h3>
+                <div id="queueStats" style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;" id="pendingCount">-</div>
+                            <div style="font-size: 0.9rem; color: #666;">Pending</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #ffa500;" id="processingCount">-</div>
+                            <div style="font-size: 0.9rem; color: #666;">Processing</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #28a745;" id="completedCount">-</div>
+                            <div style="font-size: 0.9rem; color: #666;">Completed</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #dc3545;" id="failedCount">-</div>
+                            <div style="font-size: 0.9rem; color: #666;">Failed</div>
+                        </div>
+                    </div>
+                </div>
+            
+            <h3>Supported Formats:</h3>
+            <div class="supported-formats">
+                <span class="format-tag">MP3</span>
+                <span class="format-tag">WAV</span>
+                <span class="format-tag">M4A</span>
+                <span class="format-tag">FLAC</span>
+                <span class="format-tag">OGG</span>
+                <span class="format-tag">MP4</span>
+                <span class="format-tag">AVI</span>
+                <span class="format-tag">MOV</span>
+                <span class="format-tag">MKV</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const outputContent = document.getElementById('outputContent');
+        const placeholderText = document.getElementById('placeholderText');
+        const metadata = document.getElementById('metadata');
+        const transcriptText = document.getElementById('transcriptText');
+        const segments = document.getElementById('segments');
+
+        let selectedFile = null;
+        let websocket = null;
+        let loadingMessageInterval = null;
+        
+        const loadingMessages = [
+            "Processing your audio file...",
+            "Loading transcription model...",
+            "Analyzing audio content...",
+            "Converting speech to text...",
+            "Optimizing for accuracy...",
+            "Finalizing transcription...",
+            "Preparing your results..."
+        ];
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.classList.add('show');
+            transcribeBtn.disabled = false;
+            hideMessages();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function(event) {
+                console.log('WebSocket connected');
+            };
+            
+            websocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+            
+            websocket.onclose = function(event) {
+                console.log('WebSocket disconnected');
+                // Reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'job_update':
+                    handleJobUpdate(data);
+                    break;
+                case 'queue_stats':
+                    updateQueueStats(data.stats);
+                    break;
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+
+        function handleJobUpdate(data) {
+            if (data.job_id === currentJobId) {
+                updateJobDisplay(data);
+                
+                if (data.status === 'completed' && data.result) {
+                    displayResult(data.result);
+                    showSuccess('Transcription completed successfully!');
+                    
+                    if (data.result.download_url) {
+                        setTimeout(() => {
+                            triggerDownload(data.result.download_url, data.result.filename);
+                        }, 1000);
+                    }
+                    
+                    currentJobId = null;
+                    stopLoadingMessages();
+                    loading.style.display = 'none';
+                } else if (data.status === 'failed' && data.error) {
+                    showError('Transcription failed: ' + data.error);
+                    currentJobId = null;
+                    stopLoadingMessages();
+                    loading.style.display = 'none';
+                }
+            }
+        }
+
+        function triggerDownload(downloadUrl, filename) {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename.replace(/\.[^/.]+$/, '_transcript.txt');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function subscribeToJob(jobId) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    type: 'subscribe_job',
+                    job_id: jobId
+                }));
+            }
+        }
+
+        function startLoadingMessages() {
+            const loadingMessageElement = document.getElementById('loadingMessage');
+            let currentIndex = Math.floor(Math.random() * loadingMessages.length);
+            
+            loadingMessageElement.textContent = loadingMessages[currentIndex];
+            
+            loadingMessageInterval = setInterval(() => {
+                currentIndex = (currentIndex + 1) % loadingMessages.length;
+                
+                loadingMessageElement.style.opacity = '0';
+                
+                setTimeout(() => {
+                    loadingMessageElement.textContent = loadingMessages[currentIndex];
+                    loadingMessageElement.style.opacity = '1';
+                }, 300);
+            }, 60000);
+        }
+
+        function stopLoadingMessages() {
+            if (loadingMessageInterval) {
+                clearInterval(loadingMessageInterval);
+                loadingMessageInterval = null;
+            }
+        }
+
+        function getRandomMessage() {
+            return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+        }
+
+        transcribeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('model', 'base');
+            formData.append('language', document.getElementById('languageSelect').value);
+            
+
+
+            loading.style.display = 'block';
+            transcribeBtn.disabled = true;
+            hideMessages();
+            startLoadingMessages();
+
+            try {
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showSuccess(result.message);
+                    displayJobStatus(result);
+                    currentJobId = result.job_id;
+                    subscribeToJob(result.job_id);
+                } else {
+                    showError(result.detail || 'Transcription failed');
+                    stopLoadingMessages();
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+                stopLoadingMessages();
+            } finally {
+                loading.style.display = 'none';
+                transcribeBtn.disabled = false;
+            }
+        });
+
+        function displayJobStatus(jobInfo) {
+            placeholderText.style.display = 'none';
+            outputContent.classList.add('show');
+
+            metadata.innerHTML = `
+                <div class="metadata-item">
+                    <span class="metadata-label">Job ID:</span>
+                    <span class="metadata-value">${jobInfo.job_id}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Status:</span>
+                    <span class="metadata-value">${jobInfo.status}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Queue Position:</span>
+                    <span class="metadata-value">${jobInfo.position}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Message:</span>
+                    <span class="metadata-value">${jobInfo.message}</span>
+                </div>
+            `;
+
+            transcriptText.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner" style="margin: 0 auto 20px;"></div>
+                    <div>Your job is in the queue. Please wait while we process your audio file...</div>
+                    <div style="margin-top: 10px; font-size: 0.9rem; color: #666;">
+                        Position: ${jobInfo.position} | Status: ${jobInfo.status}
+                    </div>
+                </div>
+            `;
+
+            segments.innerHTML = '';
+        }
+
+
+
+        function updateJobDisplay(jobStatus) {
+            const statusElement = document.querySelector('.metadata-value');
+            if (statusElement && statusElement.textContent.includes('Status:')) {
+                statusElement.textContent = jobStatus.status;
+            }
+
+            if (jobStatus.position !== undefined) {
+                const positionElement = document.querySelector('.metadata-value');
+                if (positionElement && positionElement.textContent.includes('Position:')) {
+                    positionElement.textContent = jobStatus.position;
+                }
+            }
+        }
+
+        function displayResult(result) {
+            placeholderText.style.display = 'none';
+            outputContent.classList.add('show');
+
+            // Display metadata
+            metadata.innerHTML = `
+                <div class="metadata-item">
+                    <span class="metadata-label">Filename:</span>
+                    <span class="metadata-value">${result.filename}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Model Used:</span>
+                    <span class="metadata-value">${result.model_used}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Language:</span>
+                    <span class="metadata-value">${result.language}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Detected Language:</span>
+                    <span class="metadata-value">${result.detected_language || 'Not detected'}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Timestamp:</span>
+                    <span class="metadata-value">${new Date(result.timestamp).toLocaleString()}</span>
+                </div>
+            `;
+
+            // Display transcript
+            transcriptText.textContent = result.transcript;
+
+            if (result.segments && result.segments.length > 0) {
+                segments.innerHTML = '<h3>Timestamps:</h3>';
+                result.segments.forEach(segment => {
+                    const segmentElement = document.createElement('div');
+                    segmentElement.className = 'segment';
+                    segmentElement.innerHTML = `
+                        <span class="segment-time">${formatTime(segment.start)} - ${formatTime(segment.end)}</span>
+                        <span class="segment-text">${segment.text}</span>
+                    `;
+                    segments.appendChild(segmentElement);
+                });
+            } else {
+                segments.innerHTML = '';
+            }
+            
+            const downloadSection = document.getElementById('downloadSection');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            if (result.download_url) {
+                downloadSection.style.display = 'block';
+                downloadBtn.onclick = () => {
+                    triggerDownload(result.download_url, result.filename);
+                };
+            } else {
+                downloadSection.style.display = 'none';
+            }
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateQueueStats(stats) {
+            document.getElementById('pendingCount').textContent = stats.pending;
+            document.getElementById('processingCount').textContent = stats.processing;
+            document.getElementById('completedCount').textContent = stats.completed;
+            document.getElementById('failedCount').textContent = stats.failed;
+        }
+
+        connectWebSocket();
+    </script>
+</body>
+</html> 
