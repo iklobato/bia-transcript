@@ -6,12 +6,9 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
-COPY poetry.lock ./
+COPY requirements.txt ./
 
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --only main --no-interaction --no-ansi --no-root
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

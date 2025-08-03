@@ -14,7 +14,6 @@ python-multipart = ">=0.0.6"
 jinja2 = ">=3.1.0"
 requests = "^2.32.4"
 openai-whisper = "^20231117"
-numpy = "<2"
 
 [tool.poetry.group.dev.dependencies]
 
