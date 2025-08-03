@@ -11,7 +11,7 @@ COPY poetry.lock ./
 
 RUN pip install poetry && \
     poetry config virtualenvs.create false && \
-    poetry install --only main --no-interaction --no-ansi
+    poetry install --only main --no-interaction --no-ansi --no-root
 
 COPY . .
 
@@ -22,4 +22,4 @@ EXPOSE 8000
 ENV PYTHONPATH=/app
 ENV PORT=8000
 
-CMD ["poetry", "run", "python", "app.py"] 
+CMD ["python", "app.py"] 
