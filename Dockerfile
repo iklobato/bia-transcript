@@ -11,7 +11,7 @@ COPY poetry.lock ./
 
 RUN pip install poetry && \
     poetry config virtualenvs.create false && \
-    poetry install --only main --no-interaction --no-ansi || pip install -r requirements.txt
+    poetry install --only main --no-interaction --no-ansi
 
 COPY . .
 

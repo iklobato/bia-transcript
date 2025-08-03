@@ -1,0 +1,28 @@
+name: bia-transcript
+services:
+- name: bia-transcript-api
+  source_dir: /
+  github:
+    repo: your-username/bia-transcript
+    branch: main
+
+  run_command: python app.py
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  envs:
+  - key: PORT
+    value: "8000"
+  - key: PYTHONPATH
+    value: "/app"
+  - key: WHISPER_MODEL
+    value: "base"
+  - key: LOG_LEVEL
+    value: "info"
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3 
