@@ -46,4 +46,4 @@ COPY --from=builder /app .
 EXPOSE 8000
 
 # Set the command to run the application
-CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "app:main"]
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "app:app"]
