@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir vosk
-RUN patchelf --set-execstack /usr/local/lib/python3.9/site-packages/vosk/libvosk.so
+
 
 # Copy the application code
 COPY . .
