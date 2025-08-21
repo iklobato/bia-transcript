@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM arm32v7/python:3.9-slim as builder
+FROM python:3.9-slim as builder
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN mkdir -p models && \
     rm vosk-model-small-pt-0.3.zip
 
 # Stage 2: Create the final image
-FROM arm32v7/python:3.9-slim
+FROM python:3.9-slim
 
 WORKDIR /app
 
