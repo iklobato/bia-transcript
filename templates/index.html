@@ -416,6 +416,13 @@
                 <h2 class="section-title">📝 Transcription Result</h2>
                 
                 <div class="output-content" id="outputContent">
+                    <div id="queueStatusMessage" style="text-align: center; padding: 40px; display: none;">
+                        <div class="spinner" style="margin: 0 auto 20px;"></div>
+                        <div>Your job is in the queue. Please wait while we process your audio file...</div>
+                        <div style="margin-top: 10px; font-size: 0.9rem; color: #666;">
+                            Position: <span id="queuePosition"></span> | Status: <span id="queueStatus"></span>
+                        </div>
+                    </div>
                     <div class="metadata" id="metadata"></div>
                     <textarea id="transcriptText" class="transcript-text" readonly></textarea>
                     <div class="segments" id="segments"></div>
@@ -499,6 +506,9 @@
         const transcriptText = document.getElementById('transcriptText');
         const segments = document.getElementById('segments');
         const copyBtn = document.getElementById('copyBtn');
+        const queueStatusMessage = document.getElementById('queueStatusMessage');
+        const queuePosition = document.getElementById('queuePosition');
+        const queueStatus = document.getElementById('queueStatus');
 
         let selectedFile = null;
         let websocket = null;
@@ -745,6 +755,7 @@
         function displayJobStatus(jobInfo) {
             placeholderText.style.display = 'none';
             outputContent.classList.add('show');
+            queueStatusMessage.style.display = 'block'; // Show the queue message
 
             metadata.innerHTML = `
                 <div class="metadata-item">
@@ -765,38 +776,37 @@
                 </div>
             `;
 
-            transcriptText.innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    <div>Your job is in the queue. Please wait while we process your audio file...</div>
-                    <div style="margin-top: 10px; font-size: 0.9rem; color: #666;">
-                        Position: ${jobInfo.position} | Status: ${jobInfo.status}
-                    </div>
-                </div>
-            `;
+            // Update the new queue status div
+            queuePosition.textContent = jobInfo.position;
+            queueStatus.textContent = jobInfo.status;
 
+            transcriptText.value = ''; // Clear any previous transcript
             segments.innerHTML = '';
         }
 
 
 
         function updateJobDisplay(jobStatus) {
-            const statusElement = document.querySelector('.metadata-value');
-            if (statusElement && statusElement.textContent.includes('Status:')) {
-                statusElement.textContent = jobStatus.status;
+            // Update the metadata section
+            const metadataStatusElement = metadata.querySelector('.metadata-item:nth-child(2) .metadata-value');
+            if (metadataStatusElement) {
+                metadataStatusElement.textContent = jobStatus.status;
             }
 
-            if (jobStatus.position !== undefined) {
-                const positionElement = document.querySelector('.metadata-value');
-                if (positionElement && positionElement.textContent.includes('Position:')) {
-                    positionElement.textContent = jobStatus.position;
-                }
+            const metadataPositionElement = metadata.querySelector('.metadata-item:nth-child(3) .metadata-value');
+            if (metadataPositionElement) {
+                metadataPositionElement.textContent = jobStatus.position;
             }
+
+            // Update the queue status message
+            queuePosition.textContent = jobStatus.position;
+            queueStatus.textContent = jobStatus.status;
         }
 
         function displayResult(result) {
             placeholderText.style.display = 'none';
             outputContent.classList.add('show');
+            queueStatusMessage.style.display = 'none'; // Hide the queue message
 
             // Display metadata
             metadata.innerHTML = `
