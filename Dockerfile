@@ -1,22 +1,49 @@
-FROM python:3.11-slim
+# Stage 1: Build the application
+FROM arm32v7/python:3.9-slim as builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential wget unzip ffmpeg libsndfile1 libffi-dev patchelf
 
-COPY requirements.txt ./
-
+# Copy requirements and install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir vosk
+RUN patchelf --set-execstack /usr/local/lib/python3.9/site-packages/vosk/libvosk.so
 
+# Copy the application code
 COPY . .
 
-RUN mkdir -p templates || true
+# Download and extract the Vosk model
+RUN mkdir -p models && \
+    cd models && \
+    wget https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip && \
+    unzip -o vosk-model-small-pt-0.3.zip && \
+    rm vosk-model-small-pt-0.3.zip
 
+# Stage 2: Create the final image
+FROM arm32v7/python:3.9-slim
+
+WORKDIR /app
+
+# Install libsndfile1 in the final stage (as root)
+RUN apt-get update && apt-get install -y --no-install-recommends libsndfile1
+
+# Create a non-root user
+RUN useradd --create-home appuser
+USER appuser
+ENV PATH="/home/appuser/.local/bin:$PATH"
+
+# Install gunicorn in the final stage
+RUN pip install --no-cache-dir gunicorn
+
+# Copy installed dependencies and application code from the builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /app .
+
+# Expose the port the app runs on
 EXPOSE 8000
 
-ENV PYTHONPATH=/app
-ENV PORT=8000
-
-CMD ["python", "app.py"] 
+# Set the command to run the application
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "app:main"]

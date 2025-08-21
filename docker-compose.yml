@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  bia-transcript:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm/v7
+    ports:
+      - "8000:8000"
+    environment:
+      - MAX_CONCURRENT_TRANSCRIPTIONS=1
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '1.0'
+          memory: 1024M

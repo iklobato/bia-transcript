@@ -12,13 +12,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-try:
-    import whisper
+import soundfile as sf
+from vosk import KaldiRecognizer, Model
 
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-    whisper = None
+VOSK_AVAILABLE = True
 
 import uvicorn
 from fastapi import (
@@ -40,9 +37,13 @@ log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-SUPPORTED_FORMATS = {'.mp3', '.wav', '.m4a', '.flac', '.ogg', '.mp4', '.avi', '.mov', '.mkv'}
+SUPPORTED_FORMATS = {'.mp3', '.wav', '.m4a', '.flac', '.ogg', '.mp4', '.avi', '.mov', '.mkv', '.opus'}
 
-whisper_model = None
+vosk_model = None
+
+# Global semaphore to limit concurrent transcription jobs
+MAX_CONCURRENT_TRANSCRIPTIONS = int(os.getenv("MAX_CONCURRENT_TRANSCRIPTIONS", 1))  # Default to 1
+transcription_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TRANSCRIPTIONS)
 
 
 class ConnectionManager:
@@ -60,6 +61,9 @@ class ConnectionManager:
             logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
+        if websocket.client_state == 3: # WebSocketState.DISCONNECTED
+            self.disconnect(websocket)
+            return
         try:
             await websocket.send_text(message)
         except Exception as e:
@@ -68,7 +72,10 @@ class ConnectionManager:
 
     async def broadcast(self, message: str):
         disconnected = []
-        for connection in self.active_connections:
+        for connection in self.active_connections[:]:  # Create a copy
+            if connection.client_state == 3: # WebSocketState.DISCONNECTED
+                disconnected.append(connection)
+                continue
             try:
                 await connection.send_text(message)
             except Exception as e:
@@ -233,13 +240,24 @@ job_queue = JobQueue()
 class AudioTranscriptionAPI:
     def __init__(self):
         self.app = FastAPI(
-            title="Bia Transcript API", description="Offline audio transcription using OpenAI Whisper Tiny model", version="1.0.0"
+            title="Bia Transcript API", description="Offline audio transcription using Vosk", version="1.0.0"
         )
         self.setup_middleware()
         self.setup_templates()
         self.setup_routes()
-        self.model_name = "base"  # Default model size for better quality
+        self.model_name = "vosk-model-small-pt-0.3"  # Default model
+        self.load_vosk_model()
         self.start_queue_processor()
+
+    def load_vosk_model(self):
+        global vosk_model
+        model_path = f"models/{self.model_name}"
+        if not os.path.exists(model_path):
+            logger.error(f"Vosk model not found at {model_path}. Please download a model and place it in the 'models' directory.")
+            # Exit or raise an exception if the model is critical for startup
+            raise RuntimeError(f"Vosk model not found at {model_path}")
+        logger.info(f"Loading Vosk model: {self.model_name}")
+        vosk_model = Model(model_path)
 
     def setup_middleware(self):
         self.app.add_middleware(
@@ -270,73 +288,82 @@ class AudioTranscriptionAPI:
                 await asyncio.sleep(1)
 
     async def process_transcription_job(self, job: TranscriptionJob):
-        try:
-            global whisper_model
-            if whisper_model is None or self.model_name != job.model:
-                logger.info(f"Loading Whisper model: {job.model}")
+        async with transcription_semaphore:
+            try:
+                global vosk_model
+                if vosk_model is None:
+                    error_msg = "Vosk model not loaded. This should not happen."
+                    logger.error(error_msg)
+                    await job_queue.complete_job(job.job_id, {}, error_msg)
+                    return
+
+                logger.info(f"Processing transcription for job {job.job_id}")
                 loop = asyncio.get_event_loop()
-                whisper_model = await asyncio.wait_for(loop.run_in_executor(None, whisper.load_model, job.model), timeout=600)
-                self.model_name = job.model
 
-            logger.info(f"Processing transcription for job {job.job_id}")
-            loop = asyncio.get_event_loop()
-            result = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: whisper_model.transcribe(
-                        job.temp_file_path,
-                        language=job.language,
-                        verbose=False,
-                        task="transcribe",
-                        fp16=False,
-                        temperature=0.0,
-                        compression_ratio_threshold=2.4,
-                        logprob_threshold=-1.0,
-                        no_speech_threshold=0.6,
-                        condition_on_previous_text=True,
-                    ),
-                ),
-                timeout=1800,
-            )
+                def transcribe():
+                    audio_file = job.temp_file_path
+                    data, samplerate = sf.read(audio_file, dtype='int16')
+                    rec = KaldiRecognizer(vosk_model, samplerate)
+                    rec.SetWords(True)
 
-            transcript = result["text"].strip()
+                    full_text = ""
+                    segments = []
+                    # Process in chunks
+                    for i in range(0, len(data), 4000):
+                        chunk = data[i:i+4000]
+                        if rec.AcceptWaveform(chunk.tobytes()):
+                            result = json.loads(rec.Result())
+                            full_text += result.get('text', '') + " "
+                            if 'result' in result:
+                                segments.extend(result['result'])
+                    result = json.loads(rec.FinalResult())
+                    full_text += result.get('text', '')
+                    if 'result' in result:
+                        segments.extend(result['result'])
 
-            response_data = {
-                "success": True,
-                "filename": job.filename,
-                "model_used": job.model,
-                "language": job.language,
-                "transcript": transcript,
-                "raw_transcript": transcript,
-                "segments": [
-                    {"start": segment["start"], "end": segment["end"], "text": segment["text"].strip()}
-                    for segment in result.get("segments", [])
-                ],
-                "detected_language": result.get("language"),
-                "processing_time": None,
-                "timestamp": datetime.now().isoformat(),
-                "download_url": f"/download/{job.job_id}",
-            }
+                    return full_text.strip(), segments
 
-            await job_queue.complete_job(job.job_id, response_data)
+                transcript, segments_data = await asyncio.wait_for(
+                    loop.run_in_executor(None, transcribe),
+                    timeout=1800,
+                )
 
-            if job.temp_file_path and os.path.exists(job.temp_file_path):
-                os.unlink(job.temp_file_path)
-                logger.debug(f"Cleaned up temporary file: {job.temp_file_path}")
+                response_data = {
+                    "success": True,
+                    "filename": job.filename,
+                    "model_used": self.model_name,
+                    "language": job.language,
+                    "transcript": transcript,
+                    "raw_transcript": transcript,
+                    "segments": [
+                        {"start": s["start"], "end": s["end"], "text": s["word"]}
+                        for s in segments_data if "start" in s
+                    ],
+                    "detected_language": job.language,
+                    "processing_time": None,
+                    "timestamp": datetime.now().isoformat(),
+                    "download_url": f"/download/{job.job_id}",
+                }
 
-        except asyncio.TimeoutError:
-            error_msg = "Job timed out during processing"
-            logger.error(f"Job {job.job_id} timed out")
-            await job_queue.complete_job(job.job_id, {}, error_msg)
+                await job_queue.complete_job(job.job_id, response_data)
 
-            if job.temp_file_path and os.path.exists(job.temp_file_path):
-                os.unlink(job.temp_file_path)
-        except Exception as e:
-            logger.error(f"Error processing job {job.job_id}: {e}")
-            await job_queue.complete_job(job.job_id, {}, str(e))
+                if job.temp_file_path and os.path.exists(job.temp_file_path):
+                    os.unlink(job.temp_file_path)
+                    logger.debug(f"Cleaned up temporary file: {job.temp_file_path}")
 
-            if job.temp_file_path and os.path.exists(job.temp_file_path):
-                os.unlink(job.temp_file_path)
+            except asyncio.TimeoutError:
+                error_msg = "Job timed out during processing"
+                logger.error(f"Job {job.job_id} timed out")
+                await job_queue.complete_job(job.job_id, {}, error_msg)
+
+                if job.temp_file_path and os.path.exists(job.temp_file_path):
+                    os.unlink(job.temp_file_path)
+            except Exception as e:
+                logger.error(f"Error processing job {job.job_id}: {e}")
+                await job_queue.complete_job(job.job_id, {}, str(e))
+
+                if job.temp_file_path and os.path.exists(job.temp_file_path):
+                    os.unlink(job.temp_file_path)
 
     def setup_routes(self):
         @self.app.get("/", response_class=HTMLResponse)
@@ -345,27 +372,26 @@ class AudioTranscriptionAPI:
 
         @self.app.get("/health")
         async def health_check():
-            global whisper_model
             queue_stats = await job_queue.get_queue_stats()
 
             status = {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "whisper_available": WHISPER_AVAILABLE,
-                "model_loaded": whisper_model is not None,
+                "vosk_available": VOSK_AVAILABLE,
+                "model_loaded": vosk_model is not None,
                 "supported_formats": list(SUPPORTED_FORMATS),
                 "queue_stats": queue_stats,
             }
 
-            if whisper_model:
+            if vosk_model:
                 status["current_model"] = self.model_name
 
             return JSONResponse(content=status)
 
         @self.app.post("/transcribe")
-        async def transcribe_audio(file: UploadFile = File(...), model: Optional[str] = "base", language: Optional[str] = "pt"):
-            if not WHISPER_AVAILABLE:
-                raise HTTPException(status_code=500, detail="Whisper is not installed. Please install with: pip install openai-whisper")
+        async def transcribe_audio(file: UploadFile = File(...), language: Optional[str] = "pt"):
+            if not VOSK_AVAILABLE:
+                raise HTTPException(status_code=500, detail="Vosk is not installed. Please install with: pip install vosk")
 
             file_extension = Path(file.filename).suffix.lower()
             if file_extension not in SUPPORTED_FORMATS:
@@ -374,15 +400,11 @@ class AudioTranscriptionAPI:
                     detail=f"Unsupported file format: {file_extension}. " f"Supported formats: {', '.join(SUPPORTED_FORMATS)}",
                 )
 
-            valid_models = ["tiny", "base", "small", "medium", "large"]
-            if model not in valid_models:
-                raise HTTPException(status_code=400, detail=f"Invalid model: {model}. Valid models: {', '.join(valid_models)}")
-
             job_id = str(uuid.uuid4())
             job = TranscriptionJob(
                 job_id=job_id,
                 filename=file.filename,
-                model=model,
+                model=self.model_name,
                 language=language,
                 status=JobStatus.PENDING,
                 position=0,
@@ -528,22 +550,10 @@ def cleanup_temp_file(file_path: str):
         logger.debug(f"Cleaned up temporary file: {file_path}")
 
 
-def main():
-    api = AudioTranscriptionAPI()
+api = AudioTranscriptionAPI()
+app = api.app
 
-    @api.app.on_event("startup")
-    async def startup_event():
-        asyncio.create_task(api.process_queue())
-        logger.info("Queue processor started")
-
-    logger.info("Starting Bia Transcript API...")
-    logger.info("API Documentation: http://localhost:8000")
-    logger.info("Health Check: http://localhost:8000/health")
-    logger.info("Interactive Docs: http://localhost:8000/docs")
-
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(api.app, host="0.0.0.0", port=port, log_level="info")
-
-
-if __name__ == "__main__":
-    main()
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(api.process_queue())
+    logger.info("Queue processor started")

@@ -417,11 +417,14 @@
                 
                 <div class="output-content" id="outputContent">
                     <div class="metadata" id="metadata"></div>
-                    <div class="transcript-text" id="transcriptText"></div>
+                    <textarea id="transcriptText" class="transcript-text" readonly></textarea>
                     <div class="segments" id="segments"></div>
                     <div class="download-section" id="downloadSection" style="display: none;">
                         <button class="download-btn" id="downloadBtn">
                             📥 Download Transcript
+                        </button>
+                        <button id="copyBtn" class="download-btn">
+                            📋 Copy to Clipboard
                         </button>
                     </div>
                 </div>
@@ -495,6 +498,7 @@
         const metadata = document.getElementById('metadata');
         const transcriptText = document.getElementById('transcriptText');
         const segments = document.getElementById('segments');
+        const copyBtn = document.getElementById('copyBtn');
 
         let selectedFile = null;
         let websocket = null;
@@ -819,7 +823,7 @@
             `;
 
             // Display transcript
-            transcriptText.textContent = result.transcript;
+            transcriptText.value = result.transcript;
 
             if (result.segments && result.segments.length > 0) {
                 segments.innerHTML = '<h3>Timestamps:</h3>';
@@ -848,6 +852,12 @@
                 downloadSection.style.display = 'none';
             }
         }
+
+        copyBtn.addEventListener('click', () => {
+            transcriptText.select();
+            navigator.clipboard.writeText(transcriptText.value);
+            showSuccess('Copied to clipboard!');
+        });
 
         function formatTime(seconds) {
             const minutes = Math.floor(seconds / 60);

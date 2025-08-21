@@ -1,13 +1,11 @@
 # Bia Transcript
 
-A FastAPI service for offline audio transcription using OpenAI Whisper with multi-language support.
+A FastAPI service for offline audio transcription using Vosk with multi-language support.
 
 ## Features
 
 - Upload audio files (MP3, WAV, M4A, FLAC, OGG, MP4, AVI, MOV, MKV)
-- Offline transcription using Whisper Base model (better quality)
-- Enhanced transcription with multi-language support
-
+- Offline transcription using Vosk models
 - Multi-language support
 - Conversation transcript formatting
 - Error handling and validation
@@ -43,14 +41,10 @@ bia-transcript/
 poetry install
 ```
 
-2. Install Whisper (if not already installed):
-```bash
-# Install Whisper using pip in the Poetry environment:
-poetry run pip install openai-whisper
-
-# Note: If you encounter NumPy compatibility issues, downgrade NumPy:
-poetry run pip install "numpy<2"
-```
+2. Download Vosk models:
+   - Create a `models` directory in the root of the project.
+   - Download the desired Vosk models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models).
+   - Extract the model archives and place the model directories inside the `models` directory. For example, for the Portuguese model, you would have `models/vosk-model-small-pt-0.3`.
 
 3. Run the application:
 ```bash
@@ -77,18 +71,6 @@ docker build -t bia-transcript .
 docker run -p 8000:8000 bia-transcript
 ```
 
-### DigitalOcean App Platform Deployment
-
-1. Push your code to GitHub
-2. Connect your repository to DigitalOcean App Platform
-3. Use the provided `do-app.yaml` configuration
-4. Deploy with:
-```bash
-doctl apps create --spec do-app.yaml
-```
-
-Or use the DigitalOcean web interface to deploy from your GitHub repository.
-
 ## API Endpoints
 
 - `GET /` - API documentation page
@@ -105,9 +87,9 @@ Or use the DigitalOcean web interface to deploy from your GitHub repository.
 
 ### Submit a transcription job:
 ```bash
-curl -X POST "http://localhost:8000/transcribe" \
-     -F "file=@audio.mp3" \
-     -F "model=base" \
+curl -X POST "http://localhost:8000/transcribe" 
+     -F "file=@audio.mp3" 
+     -F "model=vosk-model-small-pt-0.3" 
      -F "language=pt"
 ```
 
@@ -149,7 +131,6 @@ MP3, WAV, M4A, FLAC, OGG, MP4, AVI, MOV, MKV
 
 ## Model
 
-- **Base**: Good balance of speed and accuracy (~74MB) - Default
-- **Small**: Better accuracy (~244MB) - Available for higher quality
-- **Medium**: High accuracy (~769MB) - Available for highest quality
-- **Large**: Best accuracy (~1550MB) - Available for maximum quality 
+- **Vosk Models**: A variety of models for different languages and sizes are available from the [Vosk website](https://alphacephei.com/vosk/models). The default model is `vosk-model-small-pt-0.3`.
+
+``` 
