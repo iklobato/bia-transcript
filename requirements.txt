@@ -7,3 +7,6 @@ requests
 
 soundfile
 gunicorn 
+pytest
+httpx<0.28
+numpy

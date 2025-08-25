@@ -4,7 +4,7 @@ A FastAPI service for offline audio transcription using Vosk with multi-language
 
 ## Features
 
-- Upload audio files (MP3, WAV, M4A, FLAC, OGG, MP4, AVI, MOV, MKV)
+- Upload audio files (MP3, WAV, M4A, FLAC, OGG, OPUS, MP4, AVI, MOV, MKV)
 - Offline transcription using Vosk models
 - Multi-language support
 - Conversation transcript formatting
@@ -127,7 +127,9 @@ ws.onmessage = function(event) {
 
 ## Supported Formats
 
-MP3, WAV, M4A, FLAC, OGG, MP4, AVI, MOV, MKV
+MP3, WAV, M4A, FLAC, OGG, OPUS, MP4, AVI, MOV, MKV
+
+Note: Compressed formats (e.g., OPUS, MP3, OGG, M4A) are automatically transcoded to 16kHz mono WAV via ffmpeg for optimal Vosk accuracy.
 
 ## Model
 

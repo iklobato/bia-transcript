@@ -11,6 +11,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import shutil
+import subprocess
 
 import soundfile as sf
 from vosk import KaldiRecognizer, Model
@@ -251,6 +253,12 @@ class AudioTranscriptionAPI:
 
     def load_vosk_model(self):
         global vosk_model
+        # Allow tests/environments to skip model loading
+        if os.getenv("SKIP_VOSK_LOAD") == "1":
+            logger.warning("Skipping Vosk model load due to SKIP_VOSK_LOAD=1")
+            vosk_model = None
+            return
+
         model_path = f"models/{self.model_name}"
         if not os.path.exists(model_path):
             logger.error(f"Vosk model not found at {model_path}. Please download a model and place it in the 'models' directory.")
@@ -300,8 +308,46 @@ class AudioTranscriptionAPI:
                 logger.info(f"Processing transcription for job {job.job_id}")
                 loop = asyncio.get_event_loop()
 
+                def _ffmpeg_available() -> bool:
+                    return shutil.which("ffmpeg") is not None
+
+                def _convert_to_wav(input_path: str, target_sample_rate: int = 16000) -> str:
+                    if not _ffmpeg_available():
+                        raise RuntimeError("ffmpeg is required for decoding compressed formats like OPUS. Please install ffmpeg.")
+
+                    temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav", prefix="converted_")
+                    temp_wav_path = temp_wav.name
+                    temp_wav.close()
+
+                    cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        input_path,
+                        "-ac",
+                        "1",
+                        "-ar",
+                        str(target_sample_rate),
+                        "-c:a",
+                        "pcm_s16le",
+                        temp_wav_path,
+                    ]
+
+                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if result.returncode != 0:
+                        if os.path.exists(temp_wav_path):
+                            os.unlink(temp_wav_path)
+                        raise RuntimeError(f"ffmpeg failed to convert audio: {result.stderr.decode(errors='ignore').strip()}")
+
+                    return temp_wav_path
+
+                # Always normalize to 16kHz mono WAV for consistent Vosk input (handles OPUS, MP3, etc.)
+                converted_audio_path = _convert_to_wav(job.temp_file_path)
+
                 def transcribe():
-                    audio_file = job.temp_file_path
+                    audio_file = converted_audio_path
                     data, samplerate = sf.read(audio_file, dtype='int16')
                     rec = KaldiRecognizer(vosk_model, samplerate)
                     rec.SetWords(True)
@@ -350,6 +396,9 @@ class AudioTranscriptionAPI:
                 if job.temp_file_path and os.path.exists(job.temp_file_path):
                     os.unlink(job.temp_file_path)
                     logger.debug(f"Cleaned up temporary file: {job.temp_file_path}")
+                if 'converted_audio_path' in locals() and converted_audio_path and os.path.exists(converted_audio_path):
+                    os.unlink(converted_audio_path)
+                    logger.debug(f"Cleaned up converted file: {converted_audio_path}")
 
             except asyncio.TimeoutError:
                 error_msg = "Job timed out during processing"
@@ -358,12 +407,16 @@ class AudioTranscriptionAPI:
 
                 if job.temp_file_path and os.path.exists(job.temp_file_path):
                     os.unlink(job.temp_file_path)
+                if 'converted_audio_path' in locals() and converted_audio_path and os.path.exists(converted_audio_path):
+                    os.unlink(converted_audio_path)
             except Exception as e:
                 logger.error(f"Error processing job {job.job_id}: {e}")
                 await job_queue.complete_job(job.job_id, {}, str(e))
 
                 if job.temp_file_path and os.path.exists(job.temp_file_path):
                     os.unlink(job.temp_file_path)
+                if 'converted_audio_path' in locals() and converted_audio_path and os.path.exists(converted_audio_path):
+                    os.unlink(converted_audio_path)
 
     def setup_routes(self):
         @self.app.get("/", response_class=HTMLResponse)
@@ -555,5 +608,8 @@ app = api.app
 
 @app.on_event("startup")
 async def startup_event():
+    if os.getenv("DISABLE_QUEUE_PROCESSOR") == "1":
+        logger.warning("Queue processor disabled due to DISABLE_QUEUE_PROCESSOR=1")
+        return
     asyncio.create_task(api.process_queue())
     logger.info("Queue processor started")

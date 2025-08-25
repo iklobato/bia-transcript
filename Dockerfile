@@ -27,8 +27,8 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install libsndfile1 in the final stage (as root)
-RUN apt-get update && apt-get install -y --no-install-recommends libsndfile1
+# Install runtime audio deps (as root)
+RUN apt-get update && apt-get install -y --no-install-recommends libsndfile1 ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
 RUN useradd --create-home appuser
@@ -46,4 +46,4 @@ COPY --from=builder /app .
 EXPOSE 8000
 
 # Set the command to run the application
-CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "app:app"]
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "app:app"]
